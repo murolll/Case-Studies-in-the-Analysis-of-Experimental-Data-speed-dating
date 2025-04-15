@@ -12,6 +12,8 @@
 library(dplyr)
 library(network)
 library(ergm)
+library(igraph)
+library(intergraph)
 
 ## --- Step 1: Read the Data ---
 # Replace 'Speed Dating Data.csv' with the correct path if necessary.
@@ -229,6 +231,58 @@ model <- ergm(net ~ edges +
                 edgecov(like_matrix),
               control = control.ergm(MCMC.burnin = 10000, MCMC.samplesize = 10000))
 
+# WHICH MODEL MAKES MOST SENSE?
+model2 <- ergm(net ~ edges +
+                nodemix("gender", levels2 = 2) +
+                nodematch("field_cd") +
+                edgecov(int_corr_matrix) +
+                edgecov(avg_attr_matrix) +
+                edgecov(avg_sinc_matrix) +
+                edgecov(avg_intel_matrix) +
+                edgecov(avg_fun_matrix) +
+                edgecov(avg_amb_matrix) +
+                edgecov(avg_shar_matrix) +
+                edgecov(like_matrix),
+              control = control.ergm(MCMC.burnin = 10000, MCMC.samplesize = 10000))
+
 # Display a summary of the model
 summary(model)
+
+
+
+# --- Convert the 'network' object used in ERGM to igraph ---
+ig_net <- intergraph::asIgraph(net)
+
+# --- Copy attributes (e.g., gender) from original network object to igraph ---
+V(ig_net)$gender <- net %v% "gender"
+V(ig_net)$color <- ifelse(V(ig_net)$gender == "Male", "skyblue", "lightpink")
+
+# --- Plot the observed network ---
+plot(ig_net,
+     vertex.color = V(ig_net)$color,
+     vertex.size = 5,
+     vertex.label = NA,
+     edge.arrow.size = 0.3,
+     layout = layout_with_fr,
+     main = "Observed Network")
+
+# --- Simulate a network from the ERGM model ---
+set.seed(123)  # for reproducibility
+sim_net <- simulate(model, nsim = 1, output = "network")
+
+# --- Convert simulated network to igraph ---
+sim_ig_net <- intergraph::asIgraph(sim_net[[1]])
+
+# --- Transfer gender/color attributes for consistency (optional) ---
+V(sim_ig_net)$gender <- net %v% "gender"
+V(sim_ig_net)$color <- ifelse(V(sim_ig_net)$gender == "Male", "skyblue", "lightpink")
+
+# --- Plot the simulated network ---
+plot(sim_ig_net,
+     vertex.color = V(sim_ig_net)$color,
+     vertex.size = 5,
+     vertex.label = NA,
+     edge.arrow.size = 0.3,
+     layout = layout_with_fr,
+     main = "Simulated Network from ERGM")
 
