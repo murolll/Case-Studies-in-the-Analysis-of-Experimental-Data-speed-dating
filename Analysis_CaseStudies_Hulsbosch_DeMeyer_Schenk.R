@@ -231,3 +231,4 @@ model <- ergm(net ~ edges +
 
 # Display a summary of the model
 summary(model)
+
