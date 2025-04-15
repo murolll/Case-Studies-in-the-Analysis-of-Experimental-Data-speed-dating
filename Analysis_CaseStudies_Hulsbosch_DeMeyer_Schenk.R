@@ -205,8 +205,19 @@ for(i in 1:nrow(data)){
 
 ## --- Step 7: Fit the ERGM ---
 # Now we add the additional dyadic covariates to the model.
+#Putting al NA values to 0
+# In many ERGM applications, researchers fill in missing dyadic covariate values with 0 (or with a constant) if the absence is considered “no similarity” or “no signal.”
+# Alternatively, if an NA indicates that a dyad never occurred (and thus should not contribute), you may set that to 0.
+
+avg_attr_matrix[is.na(avg_attr_matrix)]  <- 0
+avg_sinc_matrix[is.na(avg_sinc_matrix)]  <- 0
+avg_intel_matrix[is.na(avg_intel_matrix)] <- 0
+avg_fun_matrix[is.na(avg_fun_matrix)]   <- 0
+avg_amb_matrix[is.na(avg_amb_matrix)]   <- 0
+avg_shar_matrix[is.na(avg_shar_matrix)]  <- 0
+like_matrix[is.na(like_matrix)]          <- 0
+
 model <- ergm(net ~ edges +
-                nodemix("gender", levels2 = c("Female.Male", "Male.Female"))+
                 nodematch("field_cd") +
                 edgecov(int_corr_matrix) +
                 edgecov(avg_attr_matrix) +
@@ -217,7 +228,6 @@ model <- ergm(net ~ edges +
                 edgecov(avg_shar_matrix) +
                 edgecov(like_matrix),
               control = control.ergm(MCMC.burnin = 10000, MCMC.samplesize = 10000))
-
 
 # Display a summary of the model
 summary(model)
