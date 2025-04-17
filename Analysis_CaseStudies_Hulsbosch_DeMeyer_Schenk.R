@@ -98,6 +98,10 @@ field_vec_char  <- as.character(field_vec)
 gender_vec_char[is.na(gender_vec_char)] <- "Missing"
 field_vec_char[is.na(field_vec_char)]   <- "Missing"
 
+# Now convert them to factors if needed:
+gender_vec_clean <- as.factor(gender_vec_char)
+field_vec_clean  <- as.factor(field_vec_char)
+
 net %v% "gender" <- as.character(gender_vec_clean)
 net %v% "field_cd" <- as.character(field_vec_clean)
 
