@@ -16,7 +16,7 @@ library(ergm)
 # Replace 'Speed Dating Data.csv' with the correct path if necessary.
 data <- read.csv("Speed Dating Data.csv", stringsAsFactors = FALSE)
 
-# Check the structure of your data
+# Check the structure 
 str(data)
 
 # Convert key variables to proper types:
@@ -95,7 +95,7 @@ field_vec_char  <- as.character(field_vec)
 gender_vec_char[is.na(gender_vec_char)] <- "Missing"
 field_vec_char[is.na(field_vec_char)]   <- "Missing"
 
-# Now convert them to factors if needed:
+# Now convert them to factors:
 gender_vec_clean <- as.factor(gender_vec_char)
 field_vec_clean  <- as.factor(field_vec_char)
 
@@ -136,7 +136,7 @@ like_matrix      <- matrix(0, nrow = num_nodes, ncol = num_nodes)
 
 # Loop over each row to fill in the matrices
 for(i in 1:nrow(data)){
-  # Only consider rows with valid partner info and a match (or valid rating), if you wish to restrict to dyads with dates.
+  # Only consider rows with valid partner info and a match (or valid rating).
   ego <- as.character(data$iid[i])
   alter <- as.character(data$pid[i])
   if(!is.na(ego) && !is.na(alter)) {
@@ -199,7 +199,7 @@ for(i in 1:nrow(data)){
     avg_shar_matrix[from_idx, to_idx] <- avg_shar
     avg_shar_matrix[to_idx, from_idx] <- avg_shar
     
-    # Like rating (only participant's rating available)
+    # Like rating 
     if(!is.na(data$like[i])){
       like_val <- data$like[i]
       like_matrix[from_idx, to_idx] <- like_val
@@ -236,7 +236,7 @@ summary(model)
 
 
 # ─────────────────────────────────────
-# 1) Make A Coefficient Plot with ggplot2
+# 1) Make A Coefficient Plot
 # ─────────────────────────────────────
 
 library(broom)
@@ -287,67 +287,6 @@ ggplot(coefs, aes(x = estimate, y = reorder(label, estimate))) +
 # Goodness-of-Fit Diagnostics
 gof_obj <- gof(model ~ degree + espartners + distance)
 plot(gof_obj)
-
-
-
-# PLOTTING THE NETWORK
-# ───────────────────────────────────────────────
-# Required libraries
-# ───────────────────────────────────────────────
-library(intergraph)  # for asIgraph()
-library(igraph)
-library(ggraph)
-library(ggplot2)
-
-# ───────────────────────────────────────────────
-# 1) Convert 'net' (network object) to igraph
-# ───────────────────────────────────────────────
-ig <- asIgraph(net)
-
-# Attach vertex names (your participant uids) and gender
-# 'nodes' is the vector of uids in the same order as net's vertices
-V(ig)$name   <- nodes
-V(ig)$gender <- net %v% "gender"
-
-# ───────────────────────────────────────────────
-# 2) Select a focal ego and build its 1‑step subgraph
-# ───────────────────────────────────────────────
-focal_uid <- nodes[1]                   # or replace with any entry from 'nodes'
-focal_vid <- which(V(ig)$name == focal_uid)
-
-# Outgoing neighbors = all j such that ego -> j
-out_neis  <- neighbors(ig, focal_vid, mode = "out")
-# Include the ego itself so we get the star plus ego
-sub_vids  <- c(focal_vid, out_neis)
-
-ego_net   <- induced_subgraph(ig, sub_vids)
-
-# Attach "liking" as an edge attribute
-# We'll look up each edge's (i,j) pair in your like_matrix
-elist     <- as_edgelist(ego_net, names = FALSE)  # matrix of vertex indices
-E(ego_net)$liking <- apply(elist, 1, function(idx) {
-  like_matrix[idx[1], idx[2]]
-})
-
-# ───────────────────────────────────────────────
-# 3) Plot the ego network with ggraph
-# ───────────────────────────────────────────────
-ggraph(ego_net, layout = "fr") +
-  geom_edge_link(aes(width = liking), alpha = 0.7) +
-  geom_node_point(aes(color = gender), size = 5) +
-  geom_node_text(aes(label = ifelse(name == focal_uid, name, "")),
-                 nudge_y = 0.2, fontface = "bold") +
-  scale_edge_width(range = c(0.4, 2)) +
-  labs(
-    title      = paste("Ego‑Network for Participant", focal_uid),
-    edge_width = "Liking",
-    color      = "Gender"
-  ) +
-  theme_void()
-
-
-
-
 
 
 ###########################################################################################
