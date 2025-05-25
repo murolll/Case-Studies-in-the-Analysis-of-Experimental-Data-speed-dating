@@ -1,1 +1,117 @@
 
+### 1. Load the data
+file_path <- "C:/Users/judit/OneDrive/Afbeeldingen/Lenovo/Case studies/Speed Dating Data.csv"
+speeddating_data <- read.csv(file_path, stringsAsFactors = FALSE)
+
+# Initial data inspection
+head(speeddating_data)
+str(speeddating_data)
+summary(speeddating_data)
+View(speeddating_data)
+
+### 2. Prepare the data
+# Convert 'match' to a factor
+speeddating_data$match <- as.factor(speeddating_data$match)
+table(speeddating_data$match)
+
+# Remove rows with missing values
+speeddating_data_clean <- na.omit(speeddating_data)
+nrow(speeddating_data_clean)
+
+### 3. Select relevant columns for modeling
+cols_needed <- c("iid", "id", "gender", "match", "int_corr", "samerace", "age_o", 
+                 "race_o", "attr_o", "field_cd", "goal")
+speeddating_data <- read.csv("C:/Users/judit/OneDrive/Afbeeldingen/Lenovo/Case studies/Speed Dating Data.csv", 
+                             colClasses = c("NULL", "NULL", "NULL", "integer", "integer", "integer", "integer", 
+                                            "integer", "integer", "integer", "integer", "integer"))
+speeddating_data <- speeddating_data[, cols_needed]
+
+### 4. Multilevel logistic regression model: Predicting match
+library(lme4)
+library(car)
+library(lmerTest)
+
+model_match_mlm_no_id <- glmer(match ~ attr_o + int_corr + samerace + age_o + 
+                                 field_cd + goal + gender + (1 | iid),  
+                               data = speeddating_data, 
+                               family = binomial(link = "logit"),
+                               control = glmerControl(optimizer = "bobyqa"))
+summary(model_match_mlm_no_id)
+anova(model_match_mlm_no_id)
+
+### 5. Linear mixed model: Predicting attractiveness
+cols_needed_attr <- c("iid", "id", "gender", "race_o", "attr_o")
+speeddating_data_attr <- speeddating_data[, cols_needed_attr]
+speeddating_data_attr <- na.omit(speeddating_data_attr)
+
+# Convert to factors
+speeddating_data_attr$gender <- as.factor(speeddating_data_attr$gender)
+speeddating_data_attr$race_o <- as.factor(speeddating_data_attr$race_o)
+
+model_attr <- lmer(attr_o ~ gender + race_o + (1 | iid), data = speeddating_data_attr)
+summary(model_attr)
+anova(model_attr)
+
+### 6. Add interaction term: Gender × Race
+model_interaction <- lmer(attr_o ~ gender * race_o + (1 | iid), data = speeddating_data)
+summary(model_interaction)
+
+### 7. Visualize fixed effects: Coefficient plot
+library(ggplot2)
+library(broom.mixed)
+library(forcats)
+
+fixed_effects <- data.frame(
+  Effect = factor(c("(Intercept)", "gender", "race_o", "gender:race_o"),
+                  levels = c("gender:race_o", "race_o", "gender", "(Intercept)")),
+  Estimate = c(6.38856, -0.29926, 0.03029, -0.08552),
+  StdError = c(0.09113, 0.12933, 0.02118, 0.03021)
+)
+fixed_effects$CI_low <- fixed_effects$Estimate - 1.96 * fixed_effects$StdError
+fixed_effects$CI_high <- fixed_effects$Estimate + 1.96 * fixed_effects$StdError
+
+ggplot(fixed_effects, aes(x = Estimate, y = Effect)) +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_point(size = 3, colour = "black") +
+  geom_errorbarh(aes(xmin = CI_low, xmax = CI_high), height = 0.2, colour = "black") +
+  scale_y_discrete(limits = rev(levels(fixed_effects$Effect))) +
+  labs(
+    x = "Estimate (95% CI)",
+    y = NULL,
+    title = "Fixed Effects Coefficient Plot",
+    subtitle = "Linear Mixed Model Predicting Attractiveness"
+  ) +
+  theme_classic(base_size = 12)
+
+### 8. Odds ratios and confidence intervals for match model
+tidy_fe <- tidy(model_match_mlm_no_id, 
+                effects = "fixed", 
+                conf.int = TRUE,        
+                exponentiate = TRUE) %>% 
+  filter(term != "(Intercept)") %>% 
+  rename(
+    OR = estimate,
+    CI_low = conf.low,
+    CI_high = conf.high,
+    p_value = p.value
+  )
+
+### 9. Interaction plot: Gender × Race on Attractiveness
+library(emmeans)
+emm <- emmeans(model_interaction, ~ gender * race_o)
+plot_data <- as.data.frame(emm)
+
+ggplot(plot_data, aes(x = race_o, y = emmean, color = gender, group = gender)) +
+  geom_point(position = position_dodge(width = 0.3), size = 3) +
+  geom_line(position = position_dodge(width = 0.3), size = 1) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), 
+                width = 0.1, position = position_dodge(width = 0.3)) +
+  labs(
+    title = "Interaction Effect: Gender × Race on Attractiveness Ratings",
+    x = "Race of the Rated Person",
+    y = "Estimated Attractiveness Rating",
+    color = "Gender"
+  ) +
+  theme_minimal()
+
+
