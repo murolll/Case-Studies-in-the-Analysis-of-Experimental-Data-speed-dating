@@ -1,4 +1,4 @@
-# R Script (General) Linear Mixed Models - Judith, Tristan, Merel 
+# R Script (General) Linear Mixed Models - Judith, Tristan, Merel.
 ### packages
 library(lme4)
 library(lmerTest)
