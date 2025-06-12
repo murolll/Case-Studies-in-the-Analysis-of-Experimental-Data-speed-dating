@@ -1,0 +1,97 @@
+# R Script (General) Linear Mixed Models - Judith, Tristan, Merel 
+### packages
+library(lme4)
+library(lmerTest)
+library(car)
+
+### 1. Load the data 
+file_path <- "C:/Users/hulsb/OneDrive - UGent/Master/Master II/Case Studies/data/Speed Dating Data.csv"
+speeddating_data <- read.csv(file_path, stringsAsFactors = FALSE)
+
+# Initial data inspection
+head(speeddating_data)
+View(speeddating_data)
+
+### 2. Prepare the data: Keep the relevant variables for the analyses in the dataframe
+cols_needed <- c("dec", "attr", "int_corr" , "samerace" , "age_o", "age" , "goal", "gender", "race", "attr_o", "iid")
+
+speeddating_data <- speeddating_data[, cols_needed]
+
+### 3. Convert variables to a factor when necessary
+speeddating_data$dec <- as.numeric(speeddating_data$dec) #ensure dec (decision no/yes) is numeric 0/1
+speeddating_data$iid <- as.factor(speeddating_data$iid)
+speeddating_data$race <- as.factor(speeddating_data$race)
+speeddating_data$gender <- factor(speeddating_data$gender, levels = c(0,1), labels = c("female","male"))
+speeddating_data$samerace <- factor(speeddating_data$samerace, levels = c(0,1), labels = c("Diff","Same"))
+speeddating_data$goal     <- factor(speeddating_data$goal,
+                      levels = 1:6,
+                      labels = c("FunNight",
+                                 "MeetPeople",
+                                 "GetDate",
+                                 "SeriousRel",
+                                 "TryIt",
+                                 "Other"))
+
+
+# Use sum-to-zero coding for 'race' and 'goal'
+options(contrasts = c("contr.sum", "contr.poly"))
+contrasts(speeddating_data$goal) <- contr.sum(n = length(levels(speeddating_data$goal)))
+
+# check:
+contrasts(speeddating_data$goal)
+contrasts(speeddating_data$samerace)  ## Careful!!SameRace1 means Diff Race, so if estimate is negative, it means there is a samerace preference
+contrasts(speeddating_data$gender)
+contrasts(speeddating_data$race)
+
+##### 4 Define the GLMM
+modelDecision <- glmer(dec  ~ attr + int_corr + samerace + age_o + goal + (1 | iid),
+family = binomial, data = speeddating_data, control = glmerControl(optimizer = "bobyqa"))
+
+summary(modelDecision)
+
+#### Follow-up question: “Does the impact of attractiveness itself vary across people?” 
+# Random‐slope model: allows each subject’s sensitivity to attractiveness to differ
+model_AttrSlope <- glmer(dec ~ attr
+                     + int_corr
+                     + samerace
+                     + age_o
+                     + goal
+                     + (1 + attr | iid),   # random intercept and slope
+                     family  = binomial(link = "logit"),
+                     data    = speeddating_data,
+                     control = glmerControl(
+                       optimizer = "bobyqa",
+                       ))
+summary(model_AttrSlope)
+anova(modelDecision, model_AttrSlope)   # likelihood‐ratio test
+
+
+#####5 LMM on Attraction: "Which factors influence attractiveness ratings?"
+model3_attr <- lmer(attr_o ~ age + int_corr + gender + race + samerace + gender*samerace + (1 | iid), data = speeddating_data)
+summary(model3_attr)
+
+
+##### 6 plot the Gender x SameRace interaction
+# 1. Load emmeans and compute the cell means
+library(emmeans)
+
+emm <- emmeans(model3_attr, ~ gender * samerace)  
+plot_data <- as.data.frame(emm)
+
+# 2. Make the interaction plot
+library(ggplot2)
+
+ggplot(plot_data, aes(x = samerace, y = emmean, color = gender, group = gender)) +
+  geom_point(position = position_dodge(width = 0.3), size = 3) +
+  geom_line(position = position_dodge(width = 0.3), size = 1) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.1,
+                position = position_dodge(width = 0.3)) +
+  labs(
+    title = "Gender × Same-Race on Attr. Ratings",
+    x     = "Same-Race Status",
+    y     = "Avg Attractiveness Rating",
+    color = "Gender"
+  ) +
+  theme_minimal(base_size = 14)
+
